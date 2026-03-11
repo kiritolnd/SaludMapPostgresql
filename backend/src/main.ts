@@ -8,12 +8,12 @@ dotenv.config();
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
-    // Configurar prefijo global para todas las rutas (Importante para SaludMap)
+    // Configurar prefijo global para todas las rutas
     app.setGlobalPrefix('api');
 
-    // Configuración de CORS combinada
+    // Configuración de CORS
     app.enableCors({
-        origin: '*', // En producción podrías querer restringir esto
+        origin: '*',
         methods: 'GET,POST,PUT,DELETE',
         credentials: true,
     });
@@ -21,11 +21,12 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
 
     try {
-        await app.listen(port);
-        //console.log(`🚀 Servidor de SaludMap + Chatbot corriendo en: http://localhost:${port}/api`);
+        // ✅ CRÍTICO para Render: escuchar en 0.0.0.0 y no solo en localhost
+        await app.listen(port, '0.0.0.0');
+        console.log(🚀 Servidor corriendo en puerto: ${port});
     } catch (error: any) {
         if (error.code === 'EADDRINUSE') {
-            console.error(`❌ Error: El puerto ${port} ya está en uso`);
+            console.error(❌ Error: El puerto ${port} ya está en uso);
             console.error('💡 Soluciones:');
             console.error('   1. Espera 5 segundos y reinicia');
             console.error('   2. Cambia el puerto: PORT=3001 npm run start:dev');
@@ -39,7 +40,7 @@ async function bootstrap() {
 
 // Manejo de señales para cierre limpio (Graceful shutdown)
 const handleExit = (signal: string) => {
-    //console.log(`${signal} recibido. Cerrando aplicación de forma segura...`);
+    console.log(${signal} recibido. Cerrando aplicación de forma segura...);
     process.exit(0);
 };
 
