@@ -6,14 +6,14 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Establecimiento {
   id             Int                          @id @default(autoincrement())
   lat            Float
-  lng            Float
+  lng            Float  
   nombre         String
   tipo           String
   direccion      String?
@@ -59,7 +59,7 @@ model Usuario {
   apellido    String
   mail        String     @unique
   contrasenia String
-  rol         String     @default("usuario") // NUEVO: "usuario" | "admin"
+  rol         String     @default("usuario") // "usuario" | "admin"
   turnos      Turno[]
   resenias    Resenia[]  @relation("ReseniasPorUsuario")
   createdAt   DateTime   @default(now())
