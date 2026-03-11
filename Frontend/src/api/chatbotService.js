@@ -16,9 +16,8 @@ const apiClient = axios.create({
  */
 export const sendMessageToAura = async (message) => {
   try {
-    const response = await apiClient.post('/api/chatbot/message', { message });
-    
-    // Mantenemos la estructura de acceso a datos que tenías
+    // ✅ CORREGIDO: era '/api/chatbot/message' y generaba /api/api/chatbot/message
+    const response = await apiClient.post('/chatbot/message', { message });
     return response.data.data.botResponse;
   } catch (error) {
     console.error("Error al comunicarse con el chatbot:", error);
