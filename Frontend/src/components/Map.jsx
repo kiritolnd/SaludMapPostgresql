@@ -21,6 +21,12 @@ import Resenias from './Resenias/Resenias';
 import { useResenias } from '../hooks/useResenias';
 import establecimientosService from '../services/establecimientosService';
 
+// ✅ URL base del backend desde variable de entorno
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:3000/api';
+
 // Fix ícono por defecto
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: markerIcon2x,
@@ -36,20 +42,16 @@ export default function MapComponent({ onEstablishmentSelect }) {
     const [isCalibrating, setIsCalibrating] = useState(false);
     const [_offlineMode, setOfflineMode] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-    // Filtros para tipos de establecimientos
     const [filters, setFilters] = useState({
         hospital: true,
         clinic: true,
         doctors: true,
         veterinary: true
     });
-
     const toggleAllFilters = () => {
         const allActive = Object.values(filters).every(Boolean);
         setFilters({ hospital: !allActive, clinic: !allActive, doctors: !allActive, veterinary: !allActive });
     };
-
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showSaveLocationModal, setShowSaveLocationModal] = useState(false);
     const [showSavedLocationsList, setShowSavedLocationsList] = useState(false);
@@ -60,7 +62,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
     const [showStatus, setShowStatus] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
 
-    // Mostrar progreso durante descargas offline
     useEffect(() => {
         if (showStatus && downloadProgress > 0 && downloadProgress < 100) {
             setStatusMessage(`${t('map.downloading')}: ${Math.round(downloadProgress)}%`);
@@ -72,11 +73,9 @@ export default function MapComponent({ onEstablishmentSelect }) {
     const lastUserInteractionAt = useRef(0);
     const userInteracting = useRef(false);
 
-    // Hook de reseñas
     const { resenias, loading: loadingResenias, promedioEstrellas, totalResenias } = 
         useResenias(selectedEstablecimiento?.id);
 
-    // Icono para usuario
     const userIcon = L.divIcon({
         html: `<div class="user-icon"></div>`,
         className: '',
@@ -85,7 +84,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
         popupAnchor: [0, -12],
     });
 
-    // Iconos por tipo
     const iconDefs = {
         hospital: { key: 'hospital', color: 'var(--marker-hospital, #e74c3c)', label: 'H' },
         clinic: { key: 'clinica', color: 'var(--marker-clinic, #3498db)', label: 'C' },
@@ -107,17 +105,14 @@ export default function MapComponent({ onEstablishmentSelect }) {
         return iconCache[key];
     };
 
-    // Configurar servicios al montar componente
     useEffect(() => {
         const unsubscribe = locationService.subscribe(handleLocationChange);
         unsubscribeRef.current = unsubscribe;
         offlineTileService.setProgressCallback(setDownloadProgress);
         locationService.loadLastKnownLocation();
         locationService.startWatching();
-
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
-        
         const handleCenterMap = (event) => {
             if (mapRef.current && !userInteracting.current) {
                 try {
@@ -125,11 +120,9 @@ export default function MapComponent({ onEstablishmentSelect }) {
                 } catch { /* noop */ }
             }
         };
-        
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
         window.addEventListener('centerMapOnLocation', handleCenterMap);
-
         return () => {
             if (unsubscribeRef.current) unsubscribeRef.current();
             locationService.stopWatching();
@@ -139,7 +132,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
         };
     }, []);
 
-    // ── NUEVO: Escuchar órdenes del Navbar Global ──
     const actionHandlerRef = useRef(null);
     actionHandlerRef.current = (action) => {
         switch(action) {
@@ -162,7 +154,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
     }, []);
 
     const handleLocationChange = async (location) => {
-        // Solo actualizar si la ubicación no fue establecida manualmente por el usuario
         if (currentLocation?.source !== 'manual') {
             setCurrentLocation(location);
             setError('');
@@ -186,13 +177,13 @@ export default function MapComponent({ onEstablishmentSelect }) {
                 try {
                     const selectedTypes = Object.keys(filters).filter(k => filters[k]);
                     const types = selectedTypes.join(',') || 'hospital,clinic,doctors,veterinary';
-                    const response = await axios.get(
-                        `/api/places?lat=${location.lat}&lng=${location.lng}&types=${types}`
-                    );
+                    // ✅ CORREGIDO: usa API_BASE_URL en vez de ruta relativa
+                    const response = await axios.get(`${API_BASE_URL}/places?lat=${location.lat}&lng=${location.lng}&types=${types}`);
                     places = normalizeApiResponse(response.data);
                     if (places.length > 0) await savePlaces(places);
                     setOfflineMode(false);
-                } catch {
+                } catch (err) {
+                    console.error('TurnosService: error fetching online places, falling back to cache', err);
                     places = await getNearbyPlaces(location);
                     setOfflineMode(true);
                 }
@@ -314,7 +305,7 @@ export default function MapComponent({ onEstablishmentSelect }) {
         try {
             const est = await establecimientosService.findOrCreate(lugar);
             setSelectedEstablecimiento(est);
-            if (onEstablishmentSelect) onEstablishmentSelect(est); // Notificamos a App.jsx
+            if (onEstablishmentSelect) onEstablishmentSelect(est);
         } catch (error) {
             toast.error('Error al cargar el establecimiento');
             setSelectedEstablecimiento(null);
@@ -335,7 +326,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
         useEffect(() => {
             mapRef.current = map;
             try { setTimeout(() => { if (map && typeof map.invalidateSize === 'function') map.invalidateSize(); }, 50); } catch { /* noop */ }
-            
             const onUserInteractionStart = () => {
                 userInteracting.current = true;
                 lastUserInteractionAt.current = Date.now();
@@ -344,14 +334,12 @@ export default function MapComponent({ onEstablishmentSelect }) {
                 lastUserInteractionAt.current = Date.now();
                 setTimeout(() => { if (Date.now() - lastUserInteractionAt.current > 1200) userInteracting.current = false; }, 1200);
             };
-            
             try {
                 map.on('movestart', onUserInteractionStart);
                 map.on('zoomstart', onUserInteractionStart);
                 map.on('moveend', onUserInteractionEnd);
                 map.on('zoomend', onUserInteractionEnd);
             } catch { /* noop */ }
-            
             return () => {
                 try {
                     map.off('movestart', onUserInteractionStart);
@@ -390,11 +378,7 @@ export default function MapComponent({ onEstablishmentSelect }) {
             <div className="map-root">
                 {!isOnline && <div className="offline-badge">{t('map.offline', '(Offline)')}</div>}
                 {error && <div className="map-error">{error}</div>}
-
-                {/* Cartel de estado superior */}
                 <div className={`status-overlay ${showStatus ? 'show' : ''}`}>{statusMessage}</div>
-
-                {/* Info de precisión (esquina inferior izquierda) */}
                 <div className="map-info">
                     {t('map.accuracy', 'Precisión')}: {currentLocation.accuracy ? `${Math.round(currentLocation.accuracy)}m` : '—'}
                     <span className="location-source">
@@ -402,8 +386,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
                             currentLocation.source === 'calibrated' ? t('map.locationSource.calibrated', 'Calibrado') : t('map.locationSource.gps', 'GPS')})
                     </span>
                 </div>
-
-                {/* CONTENIDO DEL MAPA */}
                 <div className="map-wrapper">
                     <MapContainer
                         center={[currentLocation.lat, currentLocation.lng]}
@@ -429,7 +411,7 @@ export default function MapComponent({ onEstablishmentSelect }) {
                         )}
                         {visibleLugares.map((lugar, idx) => (
                             <Marker
-                                key={lugar.id || `${lugar.lat}-${lugar.lng}-${idx}`}
+                                    key={lugar.id || `${lugar.lat}-${lugar.lng}-${idx}`}
                                 position={[lugar.lat, lugar.lng]}
                                 icon={getIconForType(lugar.type)}
                                 eventHandlers={{ click: () => handlePlaceSelect(lugar) }}
@@ -438,20 +420,16 @@ export default function MapComponent({ onEstablishmentSelect }) {
                         <MapController />
                     </MapContainer>
                 </div>
-
-                {/* ── MODALES DEL MAPA ── */}
                 <SaveLocationModal
                     isOpen={showSaveLocationModal}
                     onClose={() => setShowSaveLocationModal(false)}
                     onSave={handleSaveLocation}
                     currentLocation={currentLocation}
                 />
-                
                 <SavedLocationsList
                     isOpen={showSavedLocationsList}
                     onClose={() => setShowSavedLocationsList(false)}
                 />
-
                 {showFiltersModal && (typeof document !== 'undefined' ? ReactDOM.createPortal(
                     <div className="filter-modal show" role="dialog" aria-modal="true">
                         <h4 className="filters-title">{t('map.filters.title', 'Filtros')}</h4>
@@ -477,7 +455,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
                             <button className="btn btn-primary" onClick={() => setShowFiltersModal(false)}>Aplicar</button>
                         </div>
                     </div>, document.body) : null)}
-
                 {selectedPlace && (
                     <EstablishmentInfo
                         place={selectedPlace}
@@ -490,7 +467,6 @@ export default function MapComponent({ onEstablishmentSelect }) {
                         totalResenias={totalResenias}
                     />
                 )}
-
             </div>
         </div>
         </>
