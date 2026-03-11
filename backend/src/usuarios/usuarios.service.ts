@@ -1,5 +1,5 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '../../generated';
+import { PrismaClient } from '@prisma/client'
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();

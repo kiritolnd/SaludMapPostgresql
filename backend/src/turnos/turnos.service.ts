@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaClient } from '../../generated';
+import { PrismaClient } from '@prisma/client'
 import { CrearTurnoDto, ActualizarTurnoDto } from './dto/turno.dto';
 
 const prisma = new PrismaClient();
