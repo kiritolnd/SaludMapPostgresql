@@ -1,9 +1,15 @@
 import axios from 'axios';
 
+// ✅ URL base del backend desde variable de entorno
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:3000/api';
+
 class ReseniasService {
   constructor() {
     this.api = axios.create({
-      baseURL:'http://localhost:3000/api',
+      baseURL: API_BASE_URL, // ✅ CORREGIDO: era 'http://localhost:3000/api'
       headers: {
         'Content-Type': 'application/json',
       },
@@ -19,9 +25,6 @@ class ReseniasService {
     });
   }
 
-  /**
-   * Valida si el usuario puede dejar una reseña para un turno
-   */
   async validarPuedeReseniar(turnoId) {
     try {
       const response = await this.api.get(`/resenias/validar/${turnoId}`);
@@ -32,20 +35,11 @@ class ReseniasService {
     }
   }
 
-  /**
-   * Crea una nueva reseña
-   */
   async crearResenia(turnoId, establecimientoId, puntuacion, comentario) {
     try {
-      const response = await this.api.post(
-        '/resenias',
-        {
-          turnoId,
-          establecimientoId,
-          puntuacion,
-          comentario,
-        }
-      );
+      const response = await this.api.post('/resenias', {
+        turnoId, establecimientoId, puntuacion, comentario,
+      });
       return response.data;
     } catch (error) {
       console.error('Error creando reseña:', error);
@@ -53,9 +47,6 @@ class ReseniasService {
     }
   }
 
-  /**
-   * Obtiene las reseñas de un establecimiento
-   */
   async obtenerResenias(establecimientoId) {
     try {
       const response = await this.api.get(`/resenias/establecimiento/${establecimientoId}`);
@@ -66,9 +57,6 @@ class ReseniasService {
     }
   }
 
-  /**
-   * Obtiene las reseñas del usuario autenticado
-   */
   async misResenias() {
     try {
       const response = await this.api.get('/resenias/mis-resenias');
@@ -79,12 +67,9 @@ class ReseniasService {
     }
   }
 
-  /**
-   * Obtiene los turnos que el usuario puede reseñar
-   */
   async getTurnosParaReseniar(establecimientoId) {
     try {
-      const response = await this.api.get(`/resenias/turnos-para-reseniar`, {
+      const response = await this.api.get('/resenias/turnos-para-reseniar', {
         params: { establecimientoId }
       });
       return response.data;
@@ -94,9 +79,6 @@ class ReseniasService {
     }
   }
 
-  /**
-   * Obtiene una reseña específica
-   */
   async obtenerResenia(id) {
     try {
       const response = await this.api.get(`/resenias/${id}`);

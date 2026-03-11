@@ -2,7 +2,12 @@ import axios from 'axios';
 import locationService from './locationService.js';
 import { getNearbyPlaces, savePlaces } from './db.js';
 
-// Servicio compatible con el componente Turnos.jsx
+// ✅ URL base del backend desde variable de entorno
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:3000/api';
+
 class TurnosService {
     constructor() {
         this.subscribers = new Set();
@@ -16,7 +21,6 @@ class TurnosService {
 
     subscribe(callback) {
         this.subscribers.add(callback);
-        // Enviar estado actual inmediatamente
         callback(this.currentState);
         return () => this.subscribers.delete(callback);
     }
@@ -24,21 +28,15 @@ class TurnosService {
     notify(newState) {
         this.currentState = { ...this.currentState, ...newState };
         this.subscribers.forEach(callback => {
-            try {
-                callback(this.currentState);
-            } catch (error) {
-                console.error('Error in turnos subscriber:', error);
-            }
+            try { callback(this.currentState); }
+            catch (error) { console.error('Error in turnos subscriber:', error); }
         });
     }
 
     async initialize() {
         if (this.initialized) return;
-        // Suscribirse a cambios de ubicación
         locationService.subscribe(async (location) => {
-            if (location) {
-                await this.loadNearbyPlaces(location);
-            }
+            if (location) await this.loadNearbyPlaces(location);
         });
         this.initialized = true;
     }
@@ -49,26 +47,22 @@ class TurnosService {
             let places = [];
             try {
                 const types = ['hospital', 'clinic', 'doctors', 'veterinary'].join(',');
+                // ✅ CORREGIDO: usa API_BASE_URL
                 const response = await axios.get(
-                    `/api/places?lat=${location.lat}&lng=${location.lng}&types=${types}`
+                    `${API_BASE_URL}/places?lat=${location.lat}&lng=${location.lng}&types=${types}`
                 );
                 places = this.normalizeApiResponse(response.data);
                 if (places.length > 0) {
-                    try { await savePlaces(places); } catch (e) { console.warn('[TurnosService] No se pudo guardar cache de lugares:', e); }
+                    try { await savePlaces(places); } catch (e) { console.warn('[TurnosService] No se pudo guardar cache:', e); }
                 }
             } catch (onlineError) {
                 console.warn('TurnosService: error fetching online places, falling back to cache', onlineError);
-                const offlinePlaces = await getNearbyPlaces(location);
-                places = offlinePlaces;
+                places = await getNearbyPlaces(location);
             }
             this.notify({ lugares: places, loading: false, error: '' });
         } catch (error) {
             console.error('Error loading places for turnos:', error);
-            this.notify({
-                lugares: [],
-                loading: false,
-                error: 'Error cargando lugares cercanos'
-            });
+            this.notify({ lugares: [], loading: false, error: 'Error cargando lugares cercanos' });
         }
     }
 
@@ -79,7 +73,6 @@ class TurnosService {
         else if (Array.isArray(data.elements)) results = data.elements;
         else if (Array.isArray(data.features)) results = data.features;
         else results = data.elements ?? data.lugares ?? [];
-
         return results.map(place => ({
             ...place,
             lat: place.lat ?? place.center?.lat ?? place.geometry?.coordinates?.[1],
@@ -100,25 +93,22 @@ class TurnosService {
     }
 }
 
-// Singleton
 const turnosService = new TurnosService();
 
-// MODIFICADO: saveAppointment ahora incluye especialidadId
 export const saveAppointment = async (payload) => {
-    try {
+        try {
         const token = localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch('/api/turnos', {
+        // ✅ CORREGIDO: usa API_BASE_URL
+        const response = await fetch(`${API_BASE_URL}/turnos`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
                 usuarioId: payload.usuarioId,
                 establecimientoId: payload.establecimientoId,
-                especialidadId: payload.especialidadId, // NUEVO
+                especialidadId: payload.especialidadId,
                 fecha: payload.fecha,
                 hora: payload.hora
             })
@@ -128,34 +118,27 @@ export const saveAppointment = async (payload) => {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || `Error HTTP: ${response.status}`);
         }
-
-        const data = await response.json();
-        return data;
+        return await response.json();
     } catch (error) {
         console.error('[TurnosService] Error guardando turno:', error);
         throw error;
     }
 };
 
-// Mantener compatibilidad — guardarTurno llama a saveAppointment
-export const guardarTurno = async (payload) => {
-    return saveAppointment(payload);
-};
+export const guardarTurno = async (payload) => saveAppointment(payload);
 
 export const fetchMisTurnos = async (correo) => {
     if (!correo) return [];
-    const res = await axios.get(`/api/turnos?user=${encodeURIComponent(correo)}&includeCancelled=true`);
+    // ✅ CORREGIDO: usa API_BASE_URL
+    const res = await axios.get(`${API_BASE_URL}/turnos?user=${encodeURIComponent(correo)}&includeCancelled=true`);
     const data = res.data;
-    const arr = Array.isArray(data) ? data : (Array.isArray(data?.turnos) ? data.turnos : []);
-    return arr;
+    return Array.isArray(data) ? data : (Array.isArray(data?.turnos) ? data.turnos : []);
 };
 
 export const cancelAppointment = async (id) => {
-    if (!id) {
-        throw new Error('No se pudo cancelar: id de turno inexistente');
-    }
-    const url = `/api/turnos/${encodeURIComponent(id)}`;
-    const res = await axios.put(url, { action: 'cancelar' });
+    if (!id) throw new Error('No se pudo cancelar: id de turno inexistente');
+    // ✅ CORREGIDO: usa API_BASE_URL
+    const res = await axios.put(`${API_BASE_URL}/turnos/${encodeURIComponent(id)}`, { action: 'cancelar' });
     return res;
 };
 
